@@ -1,0 +1,430 @@
+import init.universal3470.usb.rc
+on early-init
+    mkdir /efs 0771 radio system
+
+on init
+#   start watchdogd
+	# See storage config details at http://source.android.com/tech/storage/
+    mkdir /mnt/media_rw/extSdCard 0700 media_rw media_rw
+    mkdir /mnt/media_rw/UsbDriveA 0700 media_rw media_rw
+    mkdir /mnt/media_rw/UsbDriveB 0700 media_rw media_rw
+    mkdir /mnt/media_rw/UsbDriveC 0700 media_rw media_rw
+    mkdir /mnt/media_rw/UsbDriveD 0700 media_rw media_rw
+    mkdir /mnt/media_rw/UsbDriveE 0700 media_rw media_rw
+    mkdir /mnt/media_rw/UsbDriveF 0700 media_rw media_rw
+
+    # See storage config details at http://source.android.com/tech/storage/
+    mkdir /mnt/shell/emulated 0700 shell shell
+    mkdir /storage/emulated 0555 root root
+
+    export EXTERNAL_STORAGE /storage/emulated/legacy
+    export EMULATED_STORAGE_SOURCE /mnt/shell/emulated
+    export EMULATED_STORAGE_TARGET /storage/emulated
+
+    # Support legacy paths
+    symlink /storage/emulated/legacy /sdcard
+    symlink /storage/emulated/legacy /mnt/sdcard
+    symlink /storage/emulated/legacy /storage/sdcard0
+    symlink /mnt/shell/emulated/0 /storage/emulated/legacy
+
+# map "real" external storages paths also in same way. backwards compatibility.
+    symlink /storage/extSdCard /mnt/extSdCard
+    symlink /storage/UsbDriveA /mnt/UsbDriveA
+    symlink /storage/UsbDriveB /mnt/UsbDriveB
+    symlink /storage/UsbDriveC /mnt/UsbDriveC
+    symlink /storage/UsbDriveD /mnt/UsbDriveD
+    symlink /storage/UsbDriveE /mnt/UsbDriveE
+    symlink /storage/UsbDriveF /mnt/UsbDriveF
+
+    export SECONDARY_STORAGE /storage/extSdCard
+    
+    mkdir /storage/extSdCard 0700 root root
+    mkdir /storage/UsbDriveA 0700 root root
+    mkdir /storage/UsbDriveB 0700 root root
+    mkdir /storage/UsbDriveC 0700 root root
+    mkdir /storage/UsbDriveD 0700 root root
+    mkdir /storage/UsbDriveE 0700 root root
+    mkdir /storage/UsbDriveF 0700 root root
+
+# Define TCP buffer sizes for various networks
+#   ReadMin, ReadInitial, ReadMax, WriteMin, WriteInitial, WriteMax,
+    setprop net.tcp.buffersize.default 4096,87380,704512,4096,16384,110208
+    setprop net.tcp.buffersize.wifi    524288,1048576,2560000,524288,1048576,2560000
+    setprop net.tcp.buffersize.lte     524288,1048576,2560000,524288,1048576,2560000
+    setprop net.tcp.buffersize.umts    4094,87380,704512,4096,16384,110208
+    setprop net.tcp.buffersize.hspa    4092,87380,704512,4096,16384,262144
+    setprop net.tcp.buffersize.hsupa   4092,87380,704512,4096,16384,262144
+    setprop net.tcp.buffersize.hsdpa   4092,87380,704512,4096,16384,110208
+    setprop net.tcp.buffersize.hspap   4092,87380,704512,4096,16384,262144
+    setprop net.tcp.buffersize.edge    4093,26280,35040,4096,16384,35040
+    setprop net.tcp.buffersize.gprs    4096,30000,30000,4096,8760,11680
+    setprop net.tcp.buffersize.evdo    4094,87380,262144,4096,16384,262144
+# Assign TCP buffer thresholds to be ceiling value of technology maximums
+# Increased technology maximums should be reflected here.
+    write /proc/sys/net/core/rmem_max  1048576
+    write /proc/sys/net/core/wmem_max  2097152
+
+on post-fs-data
+    mkdir /data/media 0770 media_rw media_rw
+
+    setprop vold.post_fs_data_done 1
+
+    # Add sockets for WiFi operation
+    mkdir /data/misc/wifi 0770 wifi system
+	mkdir /data/misc/wifi/sockets 0770 wifi wifi
+	mkdir /system/etc/wifi 0770 wifi wifi
+    mkdir /efs/wifi 0775 radio system
+    mkdir /efs/bluetooth 0775 radio system
+    mkdir /efs/imei 0775 radio system
+	chmod 0770 /data/misc/wifi
+    chmod 0660 /data/misc/wifi/wpa_supplicant.conf
+    chmod 0770 /system/etc/wifi
+    chmod 0660 /system/etc/wifi/wpa_supplicant.conf
+    chown wifi wifi /system/etc/wifi/wpa_supplicant.conf
+	mkdir /data/misc/dhcp 0775 dhcp dhcp
+    chown dhcp dhcp /data/misc/dhcp
+    chown system system /efs/wifi/.mac.info
+    chmod 0664 /efs/wifi/.mac.info
+
+on boot
+    mount debugfs /sys/kernel/debug /sys/kernel/debug
+    # setprop ro.radio.noril yes
+
+    # Reduce reserved lowmem from ~48MB to ~12MB
+    write /proc/sys/vm/lowmem_reserve_ratio "128 128"
+	# WIFI
+    setprop wifi.interface wlan0
+	# Set up kernel tracing, but disable it by default
+    chmod 0222 /sys/kernel/debug/tracing/trace_marker
+    write /sys/kernel/debug/tracing/tracing_on 0
+
+    # Support silent logging
+    mkdir /data/misc/dhcp 0775 dhcp dhcp
+    chown dhcp dhcp /data/misc/dhcp
+
+    # SA, System SW, Samsung create log directory
+    mkdir /data/log 0775 system log
+    chown system log /data/log
+    mkdir /data/anr 0775 system system
+    chown system system /data/anr
+
+    chmod 0775 /data/log
+    chmod 0775 /data/anr
+
+    # Permission for IPC
+    chown radio radio /dev/umts_ipc0
+
+    # Add a node for Bluetooth
+    mkdir /efs/bluetooth 0775 radio system
+
+# permissions for bluetooth.
+    setprop ro.bt.bdaddr_path "/efs/bluetooth/bt_addr"
+    chown bluetooth net_bt_stack ro.bt.bdaddr_path
+    chown bluetooth net_bt_stack /dev/ttySAC0
+    chmod 0660 /dev/ttySAC0
+    chmod 0660 /sys/class/rfkill/rfkill0/state
+    chown bluetooth net_bt_stack /sys/class/rfkill/rfkill0/state
+    chown bluetooth net_bt_stack /sys/class/rfkill/rfkill0/type
+
+    # Permission for CP FW
+    chown radio radio /data/cp_firmware.bin
+    chmod 0777 /data/cp_firmware.bin
+
+# mobicore
+    mkdir /data/app/mcRegistry 0775 system system
+    chmod 0700 /dev/mobicore
+    chmod 0666 /dev/mobicore-user
+    chmod 0660 /dev/s5p-smem
+    chown system system /dev/mobicore
+    chown radio system /dev/mobicore-user
+    chown system system /dev/s5p-smem
+
+# S.LSI secdrv mem
+    chown system system /dev/s5p-smem
+    chmod 0660 /dev/s5p-smem
+
+# CPU Idle
+    chown system radio /sys/module/cpuidle/parameters/enable_mask
+    chown system radio /sys/module/exynos3470_cpuidle/parameters/enable_mask
+
+on fs
+    mount_all /fstab.universal3470
+    setprop ro.crypto.fuse_sdcard true
+
+# Permission for EFS
+    chown radio system /efs
+    chmod 0771 /efs
+
+# create data/gps for GPS daemon
+    chown root system /dev/ttySAC1
+    chmod 0660 /dev/ttySAC1
+    chown root system /sys/class/sec/gps/GPS_PWR_EN/value
+    chmod 0664 /sys/class/sec/gps/GPS_PWR_EN/value
+# make sure data_system dir and perms are properly set.
+    mkdir /data/system 0771 system system
+    chown system system /data/system
+    mkdir /data/system/gps 0771 system system
+    chown system system /data/system/gps
+
+# delete gps Factory file
+    rm /data/gps_started
+    rm /data/glonass_started
+    rm /data/smd_started
+    rm /data/sv_cno.info
+
+# Permissions for backlight
+    chmod 0660 /sys/class/backlight/panel/brightness
+    chown system system /sys/class/backlight/panel/brightness
+    chmod 0660 /sys/class/backlight/panel/auto_brightness
+    chown system system /sys/class/backlight/panel/auto_brightness
+
+ # Permissions for LCD
+    chmod 0660 /sys/class/lcd/panel/lcd_type
+    chown system radio /sys/class/lcd/panel/lcd_type
+    chmod 0660 /sys/class/lcd/panel/window_type
+    chown system radio /sys/class/lcd/panel/window_type
+
+# Permission for gpio_keys
+    chown system radio /sys/class/sec/sec_key/wakeup_keys
+    write /sys/class/sec/sec_key/wakeup_keys 116,172
+
+# Permission for touch
+    chown system radio /sys/class/sec/tsp/cmd
+    chown system radio /sys/class/input/input0/enabled
+
+# Permissions for touchkey
+    chown system radio /sys/class/sec/sec_touchkey/touchkey_menu
+    chown system radio /sys/class/sec/sec_touchkey/touchkey_back
+    chown system radio /sys/class/sec/sec_touchkey/touchkey_threshold
+    chown system radio /sys/class/sec/sec_touchkey/brightness
+
+# Permission for vibrator
+    chown system system /sys/class/timed_output/vibrator/enable
+
+# GPIO DVS
+    chown radio system /sys/class/secgpio_check/secgpio_check_all/check_init_detail
+    chown radio system /sys/class/secgpio_check/secgpio_check_all/check_sleep_detail
+    chown radio system /sys/class/secgpio_check/secgpio_check_all/gpio_sleep_debug
+    chown radio system /sys/class/secgpio_check/secgpio_check_all/gpioinfo_check
+    chown radio system /sys/class/secgpio_check/secgpio_check_all/gpioinit_check
+    chown radio system /sys/class/secgpio_check/secgpio_check_all/gpiosleep_check
+
+# Permissions for DVFS
+    chown radio system /sys/power/cpufreq_table
+    chown radio system /sys/power/cpufreq_max_limit
+    chown radio system /sys/power/cpufreq_min_limit
+    chmod 0660 /sys/power/cpufreq_table
+    chmod 0660 /sys/power/cpufreq_max_limit
+    chmod 0660 /sys/power/cpufreq_min_limit
+
+    chown radio system /sys/class/devfreq/exynos4270-busfreq-mif/min_freq
+    chmod 0664 /sys/class/devfreq/exynos4270-busfreq-mif/min_freq
+    chown radio system /sys/class/devfreq/exynos4270-busfreq-mif/max_freq
+    chmod 0664 /sys/class/devfreq/exynos4270-busfreq-mif/max_freq
+    chown radio system /sys/class/devfreq/exynos4270-busfreq-mif/freq_table
+    chmod 0664 /sys/class/devfreq/exynos4270-busfreq-mif/freq_table
+
+    chown radio system /sys/module/mali/parameters/mali_freq_table
+    chown radio system /sys/module/mali/parameters/mali_max_freq
+    chown radio system /sys/module/mali/parameters/mali_min_freq
+    chmod 0664 /sys/module/mali/parameters/mali_freq_table
+    chmod 0664 /sys/module/mali/parameters/mali_max_freq
+    chmod 0664 /sys/module/mali/parameters/mali_min_freq
+
+# Permissions for Camera
+    chown system radio /sys/class/camera/rear/rear_camfw
+    chown system radio /sys/class/camera/rear/rear_camtype
+    chown system radio /sys/class/camera/flash/rear_flash
+    chown system radio /sys/class/camera/front/front_camfw
+    chown system radio /sys/class/camera/front/front_camtype
+
+
+# MobiCore startup
+service mobicore /system/bin/mcDriverDaemon -r /system/app/FFFFFFFF000000000000000000000001.drbin -r /system/app/mcRegistry/ffffffffd0000000000000000000000a.tlbin
+    class core
+    user system
+    group system
+
+# Permissions for bluetooth control.
+    chown bluetooth bluetooth /dev/ttySAC0
+    chmod 0666 /dev/ttySAC0
+
+# for datarouter
+    chown system system /dev/dun
+    chown system system /dev/ttyGS0
+    chown system system /dev/ttyGS1
+    chown system system /dev/ttyGS2
+    chown system system /dev/ttyGS3
+    chown system system /dev/umts_router
+
+# MTP Permission
+    chmod 0660 /dev/usb_mtp_gadget
+    chown system system /dev/usb_mtp_gadget
+
+# virtual sdcard daemon running as media_rw (1023)
+service sdcard /system/bin/sdcard -u 1023 -g 1023 -l -r /data/media /mnt/shell/emulated
+    class late_start
+	oneshot
+
+service fuse_extSdCard /system/bin/sdcard -u 1023 -g 1023 -w 1023 -d -f /mnt/media_rw/extSdCard /storage/extSdCard
+    class late_start
+    disabled
+    oneshot
+
+service fuse_UsbDriveA /system/bin/sdcard -u 1023 -g 1023 -d -f /mnt/media_rw/UsbDriveA /storage/UsbDriveA
+    class late_start
+    disabled
+    oneshot
+
+service fuse_UsbDriveB /system/bin/sdcard -u 1023 -g 1023 -d -f /mnt/media_rw/UsbDriveB /storage/UsbDriveB
+    class late_start
+    disabled
+    oneshot
+
+service fuse_UsbDriveC /system/bin/sdcard -u 1023 -g 1023 -d -f /mnt/media_rw/UsbDriveC /storage/UsbDriveC
+    class late_start
+    disabled
+    oneshot
+
+service fuse_UsbDriveD /system/bin/sdcard -u 1023 -g 1023 -d -f /mnt/media_rw/UsbDriveD /storage/UsbDriveD
+    class late_start
+    disabled
+    oneshot
+
+service fuse_UsbDriveE /system/bin/sdcard -u 1023 -g 1023 -d -f /mnt/media_rw/UsbDriveE /storage/UsbDriveE
+    class late_start
+    disabled
+    oneshot
+
+service fuse_UsbDriveF /system/bin/sdcard -u 1023 -g 1023 -d -f /mnt/media_rw/UsbDriveF /storage/UsbDriveF
+    class late_start
+    disabled
+    oneshot
+
+# Set watchdog timer to 20 seconds and pet it every 10 seconds to get a 10 second margin
+#service watchdogd /sbin/watchdogd 10 10
+#    class core
+
+# on userdebug and eng builds, enable kgdb on the serial console
+on property:ro.debuggable=1
+    write /sys/module/kgdboc/parameters/kgdboc ttyFIQ1
+    write /sys/module/fiq_debugger/parameters/kgdb_enable 1
+
+# Modem boot daemon
+service cpboot-daemon /sbin/cbd -d -t ss222 -b m -m m
+    class main
+    user root
+    group radio cache inet misc audio sdcard_rw log sdcard_r shell
+
+
+service p2p_supplicant /system/bin/wpa_supplicant \
+    -iwlan0 -Dnl80211 -c/data/misc/wifi/wpa_supplicant.conf \
+    -I/system/etc/wifi/wpa_supplicant_overlay.conf -O/data/misc/wifi/sockets -N \
+    -ip2p0 -Dnl80211 -c/data/misc/wifi/p2p_supplicant.conf \
+    -I/system/etc/wifi/p2p_supplicant_overlay.conf \
+    -puse_p2p_group_interface=1 -puse_multi_chan_concurrent=1 \
+    -e/data/misc/wifi/entropy.bin -g@android:wpa_wlan0
+    class main
+	socket wpa_wlan0 dgram 660 wifi wifi
+    disabled
+    oneshot
+
+service wpa_supplicant /system/bin/wpa_supplicant -g@android:wpa_wlan0 \
+    -iwlan0 -Dnl80211 -c/data/misc/wifi/wpa_supplicant.conf -e/data/misc/wifi/entropy.bin
+    #   we will start as root and wpa_supplicant will switch to user wifi
+    #   after setting up the capabilities required for WEXT
+    #   user wifi
+    #   group wifi inet keystore
+    class main
+    socket wpa_wlan0 dgram 660 wifi wifi
+    disabled
+    oneshot
+
+service dhcpcd_wlan0 /system/bin/dhcpcd -ABKL
+    class main
+    disabled
+    oneshot
+
+service dhcpcd_p2p /system/bin/dhcpcd -aABKL
+    class main
+    disabled
+    oneshot
+
+service iprenew_wlan0 /system/bin/dhcpcd -n
+    class main
+    disabled
+    oneshot
+
+service iprenew_p2p /system/bin/dhcpcd -n
+    class main
+    disabled
+    oneshot
+
+# GPS
+service gpsd /system/bin/gpsd -c /system/etc/gps.xml
+    class main
+    user gps
+    group system inet net_raw
+    ioprio be 0
+
+
+
+#nfc
+    chown nfc nfc /dev/pn547
+
+#sensor accelerometer
+    chown system radio /dev/accelerometer
+    chown system radio /sys/class/sensors/accelerometer_sensor/raw_data
+    chown system radio /sys/class/sensors/accelerometer_sensor/calibration
+    chown system radio /sys/class/sensors/accelerometer_sensor/name
+    chown system radio /sys/class/sensors/accelerometer_sensor/vendor
+    chmod 0664 /sys/class/sensors/accelerometer_sensor/raw_data
+    chmod 0664 /sys/class/sensors/accelerometer_sensor/calibration
+    chmod 0664 /sys/class/sensors/accelerometer_sensor/name
+    chmod 0664 /sys/class/sensors/accelerometer_sensor/vendor
+#sensor magnetic
+    chown system radio /dev/akm8963
+    chown system radio /sys/class/sensors/magnetic_sensor/adc
+    chown system radio /sys/class/sensors/magnetic_sensor/asa
+    chown system radio /sys/class/sensors/magnetic_sensor/chk_registers
+    chown system radio /sys/class/sensors/magnetic_sensor/dac
+    chown system radio /sys/class/sensors/magnetic_sensor/name
+    chown system radio /sys/class/sensors/magnetic_sensor/position
+    chown system radio /sys/class/sensors/magnetic_sensor/raw_data
+    chown system radio /sys/class/sensors/magnetic_sensor/selftest
+    chown system radio /sys/class/sensors/magnetic_sensor/status
+    chown system radio /sys/class/sensors/magnetic_sensor/vendor
+    chmod 0664 /sys/class/sensors/magnetic_sensor/adc
+    chmod 0664 /sys/class/sensors/magnetic_sensor/asa
+    chmod 0664 /sys/class/sensors/magnetic_sensor/chk_registers
+    chmod 0664 /sys/class/sensors/magnetic_sensor/dac
+    chmod 0664 /sys/class/sensors/magnetic_sensor/name
+    chmod 0664 /sys/class/sensors/magnetic_sensor/position
+    chmod 0664 /sys/class/sensors/magnetic_sensor/raw_data
+    chmod 0664 /sys/class/sensors/magnetic_sensor/selftest
+    chmod 0664 /sys/class/sensors/magnetic_sensor/status
+    chmod 0664 /sys/class/sensors/magnetic_sensor/vendor
+#sensor proximity
+    chown system radio /sys/class/sensors/proximity_sensor/adc
+    chown system radio /sys/class/sensors/proximity_sensor/name
+    chown system radio /sys/class/sensors/proximity_sensor/state
+    chown system radio /sys/class/sensors/proximity_sensor/prox_cal
+    chown system radio /sys/class/sensors/proximity_sensor/vendor
+    chown system radio /sys/class/input/input1/enable
+    chmod 0664 /sys/class/sensors/proximity_sensor/adc
+    chmod 0664 /sys/class/sensors/proximity_sensor/name
+    chmod 0664 /sys/class/sensors/proximity_sensor/state
+    chmod 0664 /sys/class/sensors/proximity_sensor/prox_cal
+    chmod 0664 /sys/class/sensors/proximity_sensor/vendor
+    chmod 0664 /sys/class/input/input1/enable
+
+# NFC
+    setprop ro.nfc.port "I2C"
+    chmod 0600 /dev/pn547
+
+
+service playlpm /system/bin/lpm
+    class sec-charger
+    critical
+
+
